@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b1417">
+<title>NestScout</title>
+<style>
+  :root { --bg:#0b1417; --panel:#13232a; --line:#23414b; --ink:#e8f4f2;
+          --muted:#7fa4a9; --accent:#38d2b4; --danger:#ff4d4d; --warn:#ffb020; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font:15px/1.35 system-ui, sans-serif; background:var(--bg); color:var(--ink);
+         padding:12px; padding-bottom:96px; }
+  header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  header h1 { font-size:17px; margin:0; letter-spacing:.5px; }
+  #link { width:10px; height:10px; border-radius:50%; background:#4a5b60; }
+  #link.ok { background:var(--accent); box-shadow:0 0 8px var(--accent); }
+  .chip { margin-left:auto; padding:5px 10px; border-radius:999px; font-size:12px;
+          background:var(--panel); border:1px solid var(--line); text-transform:uppercase; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 10px; }
+  .stat b { display:block; font-size:17px; font-weight:600; }
+  .stat span { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  .btn { border:1px solid var(--line); background:var(--panel); color:var(--ink);
+         border-radius:12px; padding:14px 10px; font-size:14px; font-weight:600;
+         text-align:center; user-select:none; touch-action:manipulation; }
+  .btn:active { transform:scale(.98); filter:brightness(1.2); }
+  .btn.accent { border-color:var(--accent); color:var(--accent); }
+  .btn.danger { border-color:var(--danger); color:#fff; background:#a31616; }
+  .btn.warn { border-color:var(--warn); color:var(--warn); }
+  .btn.wide { grid-column:1 / -1; }
+  h2 { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;
+       margin:18px 0 8px; }
+  #pad { width:100%; aspect-ratio:1; max-width:260px; margin:0 auto; border-radius:50%;
+         background:radial-gradient(circle at 50% 45%, #1b333b, #0e1c21 70%);
+         border:1px solid var(--line); position:relative; touch-action:none; }
+  #knob { position:absolute; width:38%; height:38%; left:31%; top:31%; border-radius:50%;
+          background:linear-gradient(160deg,#3a6470,#1d3a43); border:1px solid #4c7b87;
+          display:grid; place-items:center; font-size:11px; color:var(--muted); }
+  #cam, #thermal { width:100%; border-radius:12px; border:1px solid var(--line);
+                   background:#000; display:block; }
+  #thermal { image-rendering:pixelated; }
+  #log { font:12px/1.5 ui-monospace, monospace; color:var(--muted); }
+  #log b { color:var(--accent); font-weight:600; }
+  #estopBar { display:none; position:sticky; top:0; z-index:9; background:#7d0f0f;
+              color:#fff; padding:12px; border-radius:12px; margin-bottom:10px;
+              font-weight:700; text-align:center; }
+  #alertBar { display:none; position:sticky; top:0; z-index:8; background:#0d5c4a;
+              color:#fff; padding:12px; border-radius:12px; margin-bottom:10px;
+              border:1px solid var(--accent); font-weight:600; }
+  #alertBar button { float:right; margin-left:12px; background:transparent; color:#fff;
+                     border:1px solid #fff; border-radius:8px; padding:4px 10px;
+                     font:inherit; font-weight:600; }
+  input[type=number] { width:100%; background:#0d1a1f; color:var(--ink);
+                       border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div id="estopBar">E-STOP ACTIVE — tap RESET E-STOP, then release the button</div>
+<div id="alertBar"><button onclick="document.getElementById('alertBar').style.display='none'">DISMISS</button>
+NEST DETECTED · <span id="alertText"></span></div>
+
+<header>
+  <div id="link"></div>
+  <h1>NestScout</h1>
+  <div class="chip" id="mode">offline</div>
+</header>
+
+<div class="grid">
+  <div class="stat"><span>GPS</span><b id="fix">—</b></div>
+  <div class="stat"><span>Sats / HDOP</span><b id="sats">—</b></div>
+  <div class="stat"><span>Battery</span><b id="batt">—</b></div>
+  <div class="stat"><span>Heading</span><b id="head">—</b></div>
+  <div class="stat"><span>Ground</span><b id="lidar">—</b></div>
+  <div class="stat"><span>Hits</span><b id="hits">0</b></div>
+  <div class="stat"><span>CO2</span><b id="co2">—</b></div>
+  <div class="stat"><span>Temp</span><b id="stemp">—</b></div>
+  <div class="stat"><span>Moisture</span><b id="moist">—</b></div>
+  <div class="stat" style="grid-column:1/-1"><span>Position</span><b id="pos">—</b></div>
+  <div class="stat" style="grid-column:1/-1"><span>Mission</span><b id="prog">idle</b></div>
+</div>
+
+<h2>Drive</h2>
+<div id="pad"><div id="knob">DRIVE</div></div>
+<div class="row">
+  <div class="btn danger" onclick="post('/api/stop')">STOP</div>
+  <div class="btn warn" onclick="post('/api/estop_reset')">RESET E-STOP</div>
+</div>
+
+<h2>Camera</h2>
+<img id="cam" src="/video" alt="camera">
+<img id="thermal" src="/thermal.jpg" alt="thermal" style="margin-top:8px">
+
+<h2>Home</h2>
+<div class="row">
+  <div class="btn accent" onclick="post('/api/arm')">SET HOME HERE</div>
+  <div class="btn" onclick="post('/api/home')">RETURN HOME</div>
+  <div class="btn wide" onclick="goToPhone()">COME TO MY PHONE</div>
+</div>
+
+<h2>Survey strip</h2>
+<div class="row">
+  <div class="btn" onclick="capture('A')">CAPTURE CORNER A</div>
+  <div class="btn" onclick="capture('B')">CAPTURE CORNER B</div>
+</div>
+<div class="hint" id="corners">Corner A: —<br>Corner B: —</div>
+<div class="row" style="margin-top:8px">
+  <label class="hint">Lanes<input type="number" id="lanes" value="4" min="1" max="40"></label>
+  <label class="hint">Lane spacing (m)<input type="number" id="spacing" value="1.0" step="0.1"></label>
+</div>
+<div class="row">
+  <div class="btn accent wide" onclick="startScan()">START SCAN</div>
+  <div class="btn wide" onclick="post('/api/abort')">ABORT MISSION</div>
+</div>
+<div class="hint">Corner A and B must be the two ends of the <em>first</em> lane. Lanes run to
+their right, alternating direction.</div>
+
+<h2>Detections</h2>
+<div id="log">No hits yet.</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let status = null, cornerA = null, cornerB = null;
+let padTimer = null, padPointer = null, throttle = 0, steer = 0;
+let lastHits = null;              /* previous detection count, to spot a new hit */
+
+async function post(path, body) {
+  try {
+    await fetch(path, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) });
+  } catch (e) { /* link drops are expected on the beach */ }
+}
+
+const fmt = (v, unit = "", digits = 1) =>
+  (v === null || v === undefined) ? "—" : Number(v).toFixed(digits) + unit;
+
+function render(s) {
+  $("link").className = "ok";
+  $("mode").textContent = s.mode + (s.arming ? " · arming" : "");
+  $("fix").textContent = s.fix || "—";
+  $("sats").textContent = (s.sats ?? "—") + " / " + fmt(s.hdop, "", 1);
+  $("batt").textContent = fmt(s.battery_v, " V", 2);
+  $("batt").style.color = (s.battery_v && s.battery_v < 12.1) ? "var(--danger)" : "";
+  $("head").textContent = fmt(s.heading, "°", 0);
+  $("lidar").textContent = fmt(s.lidar_m, " m", 2);
+  $("hits").textContent = s.detection_count ?? 0;
+  $("co2").textContent = fmt(s.co2_ppm, " ppm", 0);
+  $("stemp").textContent = fmt(s.ref_temp_c, " °C", 1);
+  $("moist").textContent = fmt(s.moisture_pct, " %", 0);
+  $("pos").textContent = s.lat ? s.lat.toFixed(7) + ", " + s.lon.toFixed(7) : "no fix";
+  $("prog").textContent = s.mode === "scan"
+    ? `${s.progress}% · wp ${s.waypoint}` : s.mode;
+  $("estopBar").style.display = s.estop ? "block" : "none";
+
+  const hits = s.detection_count ?? 0;
+  if (lastHits !== null && hits > lastHits) {
+    const newest = (s.detections || [])[s.detections.length - 1];
+    if (newest) showAlert(newest);     /* banner + vibration, once per new hit */
+  }
+  lastHits = hits;
+
+  const list = s.detections || [];
+  $("log").innerHTML = list.length ? list.slice().reverse().map(d =>
+    `<div><b>${d.kind}</b> ${d.lat.toFixed(6)}, ${d.lon.toFixed(6)}
+     · conf ${d.confidence ?? "—"} · cnn ${d.cnn_prob ?? "—"}
+     · z ${d.z} · ${d.temp_c} °C · ΔT ${d.delta_c ?? "—"} °C
+     · CO₂ ${d.co2_ppm ?? "—"} ppm · ${d.moisture_pct ?? "—"} % · ${d.time}</div>`
+  ).join("") : "No hits yet.";
+}
+
+function showAlert(d) {
+  $("alertText").textContent =
+    `${d.kind} · conf ${d.confidence ?? "—"} · ${d.lat.toFixed(6)}, ${d.lon.toFixed(6)}` +
+    ` · ${d.temp_c} °C`;
+  $("alertBar").style.display = "block";
+  if (navigator.vibrate) navigator.vibrate([300, 120, 300]);
+  clearTimeout(showAlert.timer);
+  showAlert.timer = setTimeout(() => { $("alertBar").style.display = "none"; }, 20000);
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/status");
+    status = await r.json();
+    render(status);
+  } catch (e) { $("link").className = ""; $("mode").textContent = "offline"; }
+}
+setInterval(refresh, 1000);
+refresh();
+
+/* thermal frame is a still image; reload it with a cache-buster */
+setInterval(() => { $("thermal").src = "/thermal.jpg?" + Date.now(); }, 700);
+
+/* ---- joystick ---- */
+const pad = $("pad"), knob = $("knob");
+function vector(ev) {
+  const r = pad.getBoundingClientRect();
+  let dx = (ev.clientX - (r.left + r.width / 2)) / (r.width / 2);
+  let dy = (ev.clientY - (r.top + r.height / 2)) / (r.height / 2);
+  const mag = Math.hypot(dx, dy);
+  if (mag > 1) { dx /= mag; dy /= mag; }
+  return { dx, dy };
+}
+function sendDrive() {
+  post("/api/drive", { throttle, steer });
+}
+pad.addEventListener("pointerdown", (ev) => {
+  pad.setPointerCapture(ev.pointerId);
+  padPointer = ev.pointerId;
+  if (!padTimer) padTimer = setInterval(sendDrive, 120);
+  move(ev);
+});
+pad.addEventListener("pointermove", (ev) => { if (ev.pointerId === padPointer) move(ev); });
+["pointerup", "pointercancel"].forEach(name => pad.addEventListener(name, release));
+function move(ev) {
+  const { dx, dy } = vector(ev);
+  steer = dx;
+  throttle = -dy;
+  knob.style.transform = `translate(${dx * 55}%, ${dy * 55}%)`;
+}
+function release() {
+  padPointer = null;
+  throttle = steer = 0;
+  knob.style.transform = "";
+  clearInterval(padTimer);
+  padTimer = null;
+  post("/api/drive", { throttle: 0, steer: 0 });
+}
+
+/* ---- mission ---- */
+function capture(which) {
+  if (!status || !status.lat) return alert("No GPS fix");
+  const point = { lat: status.lat, lon: status.lon };
+  if (which === "A") cornerA = point; else cornerB = point;
+  $("corners").innerHTML =
+    `Corner A: ${cornerA ? cornerA.lat.toFixed(7) + ", " + cornerA.lon.toFixed(7) : "—"}<br>` +
+    `Corner B: ${cornerB ? cornerB.lat.toFixed(7) + ", " + cornerB.lon.toFixed(7) : "—"}`;
+}
+function startScan() {
+  if (!cornerA || !cornerB) return alert("Capture both corners first");
+  post("/api/scan", {
+    lat1: cornerA.lat, lon1: cornerA.lon,
+    lat2: cornerB.lat, lon2: cornerB.lon,
+    lanes: +$("lanes").value,
+    spacing: +$("spacing").value
+  });
+}
+function goToPhone() {
+  if (!navigator.geolocation) return alert("No geolocation on this phone");
+  navigator.geolocation.getCurrentPosition(
+    (p) => post("/api/goto", { lat: p.coords.latitude, lon: p.coords.longitude }),
+    () => alert("Could not read phone position"),
+    { enableHighAccuracy: true, timeout: 8000 });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+Carbon dioxide level
+Sand moisture
+Sand temperature
+Thermal camera reading
+Consistency ng readings
+Location at time

@@ -1,0 +1,15 @@
+# Hardware libraries for the Raspberry Pi. picamera2 and libcamera come from apt
+# (python3-picamera2), not from pip — see the build guide, section 6.3.
+adafruit-blinka
+adafruit-circuitpython-mlx90640
+adafruit-circuitpython-bno08x
+adafruit-circuitpython-ina219
+adafruit-circuitpython-scd4x
+adafruit-circuitpython-ads1x15
+pynmea2
+pyserial
+tflite-runtime            # CNN inference on the Pi; tensorflow is only needed to train
+flask
+pillow
+numpy
+pyyaml

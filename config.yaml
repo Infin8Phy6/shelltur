@@ -1,0 +1,106 @@
+robot:
+  max_speed: 0.20          # m/s while scanning (slow = clean thermal frames)
+  manual_speed: 0.60       # m/s joystick limit
+  wheel_diameter: 0.26     # m, measure your tyres
+  ticks_per_rev: 1440      # encoder CPR after gearbox (measure it, see §12)
+  ramp_per_s: 0.8          # duty units per second
+
+pins:                      # BCM numbering
+  left:   {rpwm: 12, lpwm: 13, enc_a: 5,  enc_b: 6,  invert: false}
+  right:  {rpwm: 18, lpwm: 19, enc_a: 16, enc_b: 26, invert: true}
+  estop: 21
+  buzzer: 25
+  led: 17
+
+gps:
+  port: /dev/ttyAMA0
+  baud: 38400
+  min_quality: 1           # 1 GPS, 2 DGPS, 4 RTK fixed, 5 RTK float
+  max_hdop: 2.5
+  min_sats: 6
+  home_settle_s: 10        # average this long before committing "home"
+
+lidar:
+  port: /dev/ttyUSB0
+  baud: 115200
+  obstacle_stop_m: 0.90    # anything closer than this ahead = stop
+
+imu:
+  i2c_address: 0x4A
+  declination_deg: 0.0     # magnetic declination at your beach (east +)
+
+battery:
+  low_v: 12.10             # 12 V LiFePO4: abort mission and limp home below this
+
+thermal:
+  refresh_hz: 8
+
+scd41:                     # CO2, I2C 0x62
+  i2c_address: 0x62
+
+ds18b20:                   # 1-Wire temperature probe on GPIO4
+  sensor_id: ""            # blank = first 28-* device found
+  # Probe in the sand = substrate reference, in the air = ambient reference.
+  # The detector only uses the difference, so either mounting works.
+
+moisture:                  # SEN0193 capacitive probe via ADS1115, I2C 0x48
+  adc_address: 0x48
+  channel: 0
+  dry_v: 2.45              # volts with the probe in dry sand (calibrate, see guide)
+  wet_v: 1.30              # volts with the probe in saturated sand
+
+mission:
+  arrive_radius_m: 0.90
+  sample_spacing_m: 1.50   # waypoint spacing along each lane
+  lane_spacing_m: 1.00     # never wider than the thermal swath (~1.04 m)
+  settle_s: 0.5            # pause at each waypoint before sampling
+  max_runtime_min: 90
+  max_home_distance_m: 400
+
+detector:
+  mount: {height_m: 1.00, tilt_deg: 30.0, hfov_deg: 55.0, vfov_deg: 35.0}
+  z_threshold: 2.6
+  min_cluster_cells: 3
+  confirm_frames: 8
+  cluster_radius_m: 1.0
+  suppress_radius_m: 3.0
+  suppress_time_s: 120
+  min_delta_c: 1.2         # cluster must differ from DS18B20 by this much
+  weak_delta_c: 0.25       # CNN path: accept ΔT down to this (shells read +0.4..0.6)
+  weak_z_threshold: 1.8    # CNN path: cluster threshold for the faint pattern
+  co2_delta_ppm: 90        # CO2 must rise this far above the rolling baseline
+  co2_baseline_s: 120      # baseline window
+  moisture_min_pct: 5      # drier sand is unlikely to hold a clutch
+  moisture_max_pct: 85     # saturated sand is equally unlikely
+  consistency_temp_c: 0.8  # spread that halves the temperature part of consistency
+  consistency_min: 0.6     # reject a group whose readings disagree more than this
+  env_gate: true           # false = thermal-only (use for the warm-bottle bench test)
+
+cnn:                       # tiny thermal classifier (detect/thermal_cnn.py)
+  enabled: true
+  model: models/thermal_nest.tflite   # path relative to the project root
+  min_prob: 0.60                      # weak-contrast hit needs at least this
+
+gsm:                       # SIM7600/SIM800L on a USB serial port
+  enabled: true
+  port: /dev/ttyUSB1       # check /dev/serial/by-id/ for a stable name
+  baud: 115200
+  phone: ""                # destination number, e.g. "+639171234567"
+
+alerts:                    # what happens when a nest is confirmed
+  led_flashes: 6           # fast blinks on pins.led
+  siren: false             # true once a 12 V siren is wired
+  siren_pin: 27            # BCM pin driving the MOSFET/relay
+  siren_s: 1.0             # seconds of siren per detection
+  sms_min_confidence: 0.60 # only text hits at least this strong
+  sms_cooldown_s: 300      # at most one SMS per 5 minutes
+
+web:
+  host: 0.0.0.0
+  port: 80
+  command_timeout_s: 1.0   # seconds without a drive command before auto-stop
+
+camera:
+  enabled: true
+  width: 1280
+  height: 720

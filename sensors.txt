@@ -1,0 +1,5 @@
+MLX90640 thermal camera
+Sensirion SCD41 CO2 sensor
+DS18B20 temperature sensor
+capacitive humidity sensor - SENO193
+BTS7960 2-channel motor driver
